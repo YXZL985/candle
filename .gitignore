@@ -5,6 +5,7 @@
 # Build directories
 build/
 cmake-build-*/
+dist/*
 
 # Allow scripts/build directory
 !scripts/build/
