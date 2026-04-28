@@ -406,16 +406,13 @@ bool MainWindow::autoStartDaemon()
 
     // 获取 numlockd 可执行文件路径
     QString exePath = QCoreApplication::applicationDirPath();
-    QString daemonPath = exePath + "/numlockd/numlockd";
+    // 尝试在相同目录查找 numlockd（安装后的位置）
+    QString daemonPath = exePath + "/numlockd";
 
     // 检查文件是否存在
     if (!QFile::exists(daemonPath)) {
-        // 尝试在当前目录查找
-        daemonPath = exePath + "/numlockd";
-        if (!QFile::exists(daemonPath)) {
-            appendLog(tr("找不到守护进程可执行文件"));
-            return false;
-        }
+        appendLog(tr("找不到守护进程可执行文件: %1").arg(daemonPath));
+        return false;
     }
 
     // 创建进程

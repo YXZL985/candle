@@ -11,12 +11,17 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Network)
 find_package(Dtk6 REQUIRED COMPONENTS Core)
 
-check_include_file(linux/uinput.h HAVE_LINUX_UINPUT_H)
+include(CheckIncludeFileCXX)
+check_include_file_cxx(linux/uinput.h HAVE_LINUX_UINPUT_H)
 if(NOT HAVE_LINUX_UINPUT_H)
     message(FATAL_ERROR "linux/uinput.h not found")
 endif()
 
 add_executable(numlockd)
+
+set_target_properties(numlockd PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
 target_sources(numlockd PRIVATE
     main.cpp
@@ -30,4 +35,8 @@ target_link_libraries(numlockd PRIVATE
     Qt6::Core
     Qt6::Network
     Dtk6::Core
+)
+
+install(TARGETS numlockd
+    RUNTIME DESTINATION bin
 )

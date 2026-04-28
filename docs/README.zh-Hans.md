@@ -1,0 +1,129 @@
+# 🕯️ 秉烛 (Candle)
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Qt6](https://img.shields.io/badge/Qt-6.2+-green.svg)](https://www.qt.io/)
+[![DTK6](https://img.shields.io/badge/DTK-6.0+-orange.svg)](https://github.com/linuxdeepin/dtk6widget)
+
+🌐 **语言**: [English](README.md) | [简体中文](README.zh-Hans.md) | [繁體中文](README.zh-Hant.md)
+
+一个基于 DTK6/Qt6 开发的桌面应用程序，用于临时阻止自动息屏、锁屏和系统休眠，通过模拟数字锁定（NumLock）按键实现。
+
+## ✨ 功能特性
+
+- **🎛️ 服务控制**：启动、停止、重启数字锁定守护进程
+- **⚙️ 参数配置**：调节数字锁定模拟间隔（分钟）
+- **📜 实时日志**：在面板中查看守护进程实时日志
+- **🔔 系统集成**：通过 systemd 服务运行
+
+## 📋 环境要求
+
+- Linux 操作系统
+- Qt6 (>= 6.2)
+- DTK6 (Deepin Toolkit 6)
+- systemd
+- `/dev/uinput` 设备访问权限
+
+## 🚀 编译步骤
+
+```bash
+# 创建构建目录
+mkdir build && cd build
+
+# CMake 配置
+cmake ..
+
+# 编译
+cmake --build .
+```
+
+## 📦 安装指南
+
+### 准备工作
+
+1. 确保拥有 `/dev/uinput` 访问权限：
+   ```bash
+   # 将当前用户添加到 input 组
+   sudo usermod -aG input $USER
+   # 重新登录以使权限生效
+   ```
+
+2. 安装编译依赖：
+   - Qt6 开发包
+   - DTK6 开发包
+   - CMake >= 3.16
+   - GCC/G++ 需支持 C++17
+
+### 构建与安装
+
+```bash
+# 构建项目
+mkdir build && cd build
+cmake ..
+cmake --build .
+
+# 安装（需要 root 权限）
+sudo cmake --install .
+```
+
+### 服务安装
+
+运行安装脚本：
+
+```bash
+sudo ./scripts/install.sh
+```
+
+该脚本将执行以下操作：
+1. 检查 `/dev/uinput` 权限
+2. 安装 systemd 服务文件
+3. 启用并启动 numlockd 服务
+
+## 📝 使用方法
+
+1. 启动 Candle 应用程序
+2. 使用控制按钮启动/停止数字锁定守护进程
+3. 调节数值输入框中的数值，点击"应用"按钮使配置生效
+4. 在日志面板中查看实时日志
+
+## 📁 项目结构
+
+```
+candle/
+├── src/                    # 源代码
+│   ├── app/               # 图形界面应用程序
+│   │   ├── main.cpp
+│   │   ├── mainwindow.cpp
+│   │   ├── mainwindow.h
+│   │   └── resources.qrc
+│   └── numlockd/          # 守护进程源码
+│       ├── main.cpp
+│       ├── ipc_server.cpp
+│       ├── ipc_server.h
+│       ├── numlock_simulator.cpp
+│       └── numlock_simulator.h
+├── assets/                # 资源文件
+│   └── images/
+│       └── logo.svg
+├── docs/                  # 文档目录
+│   ├── README.md          # 英文文档
+│   ├── README.zh-Hans.md  # 简体中文
+│   └── README.zh-Hant.md  # 繁体中文
+├── scripts/               # 脚本
+│   └── install.sh
+├── config/                # 配置文件
+│   └── numlockd.service
+├── CMakeLists.txt         # 构建配置
+└── LICENSE.txt            # 许可证
+```
+
+## 📄 许可证
+
+本项目采用 GNU 通用公共许可证第三版 (GPLv3) 进行授权。详细信息请参阅 [LICENSE.txt](../LICENSE.txt)。
+
+## 🤝 贡献
+
+欢迎贡献代码！请随意提交 Issues 和 Pull Requests。
+
+---
+
+💡 **提示**："秉烛"寓意手持蜡烛，象征着保持屏幕常亮，防止进入息屏状态。

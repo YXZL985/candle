@@ -24,14 +24,16 @@ fi
 echo "权限检查通过"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SERVICE_FILE="$PROJECT_DIR/config/numlockd.service"
 
-if [ ! -f "$SCRIPT_DIR/numlockd.service" ]; then
+if [ ! -f "$SERVICE_FILE" ]; then
     echo "错误: 未找到 numlockd.service 文件"
     exit 1
 fi
 
 echo "复制 numlockd.service 到 /etc/systemd/system/..."
-sudo cp "$SCRIPT_DIR/numlockd.service" /etc/systemd/system/
+sudo cp "$SERVICE_FILE" /etc/systemd/system/
 
 echo "重新加载 systemd 配置..."
 sudo systemctl daemon-reload
