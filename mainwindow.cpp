@@ -6,7 +6,11 @@
 #include <DTitlebar>
 
 #include <QDateTime>
+#include <QDir>
 #include <QIcon>
+#include <QLocalSocket>
+#include <QProcess>
+#include <QThread>
 
 DWIDGET_USE_NAMESPACE
 
@@ -16,6 +20,10 @@ DWIDGET_USE_NAMESPACE
 MainWindow::MainWindow(QWidget *parent)
     : DMainWindow(parent)
     , m_isServerRunning(false)
+    , m_ipcSocket(nullptr)
+    , m_socketPath("numlockd")
+    , m_daemonProcess(nullptr)
+    , m_autoStarted(false)
 {
     // 设置窗口属性
     setMinimumSize(QSize(900, 500));
@@ -34,6 +42,27 @@ MainWindow::MainWindow(QWidget *parent)
     // 初始化状态
     m_statusValueLabel->setText(tr("已停止"));
     m_statusValueLabel->setStyleSheet("color: #999;");
+    
+    // 初始化 IPC Socket
+    m_ipcSocket = new QLocalSocket(this);
+    connect(m_ipcSocket, &QLocalSocket::connected, this, &MainWindow::onSocketConnected);
+    connect(m_ipcSocket, &QLocalSocket::disconnected, this, &MainWindow::onSocketDisconnected);
+    connect(m_ipcSocket, &QLocalSocket::readyRead, this, &MainWindow::onSocketReadyRead);
+    connect(m_ipcSocket, QOverload<QLocalSocket::LocalSocketError>::of(&QLocalSocket::errorOccurred),
+            this, &MainWindow::onSocketError);
+    
+    // 尝试连接到守护进程，如果失败则自动启动
+    if (!isDaemonRunning()) {
+        appendLog(tr("守护进程未运行，正在自动启动..."));
+        if (autoStartDaemon()) {
+            appendLog(tr("守护进程启动成功"));
+        } else {
+            appendLog(tr("守护进程启动失败"));
+        }
+    }
+    
+    // 连接到守护进程
+    connectToDaemon();
     
     // 添加启动日志
     appendLog(tr("应用程序已启动"));
@@ -190,6 +219,11 @@ void MainWindow::onStartServer()
     
     // 记录日志
     appendLog(tr("服务已启动，设定时间: %1 分钟").arg(m_valueSpinBox->value()));
+    
+    // 如果已连接，发送配置到守护进程
+    if (m_ipcSocket && m_ipcSocket->state() == QLocalSocket::ConnectedState) {
+        sendConfigToDaemon(m_valueSpinBox->value());
+    }
 }
 
 /**
@@ -214,6 +248,24 @@ void MainWindow::onStopServer()
     
     // 记录日志
     appendLog(tr("服务已停止"));
+    
+    // 断开与守护进程的连接
+    if (m_ipcSocket && m_ipcSocket->state() == QLocalSocket::ConnectedState) {
+        m_ipcSocket->disconnectFromServer();
+    }
+    
+    // 如果是本程序自动启动的守护进程，则终止它
+    if (m_autoStarted && m_daemonProcess) {
+        appendLog(tr("正在终止守护进程..."));
+        m_daemonProcess->terminate();
+        if (!m_daemonProcess->waitForFinished(3000)) {
+            m_daemonProcess->kill();
+        }
+        delete m_daemonProcess;
+        m_daemonProcess = nullptr;
+        m_autoStarted = false;
+        appendLog(tr("守护进程已终止"));
+    }
 }
 
 /**
@@ -230,6 +282,12 @@ void MainWindow::onApplyConfig()
     } else {
         appendLog(tr("配置已更新为时间 %1 分钟").arg(timeValue));
     }
+    
+    // 如果已连接，发送新配置到守护进程
+    if (m_ipcSocket && m_ipcSocket->state() == QLocalSocket::ConnectedState) {
+        sendConfigToDaemon(timeValue);
+        appendLog(tr("配置已发送到守护进程: %1 分钟").arg(timeValue));
+    }
 }
 
 /**
@@ -241,4 +299,186 @@ void MainWindow::appendLog(const QString &message)
     QString logEntry = QString("[%1] %2").arg(timestamp, message);
     
     m_logTextEdit->append(logEntry);
+}
+
+/**
+ * @brief 更新服务器状态显示
+ */
+void MainWindow::updateServerStatus()
+{
+    if (m_isServerRunning) {
+        m_statusValueLabel->setText(tr("运行中 (时间: %1 分钟)").arg(m_valueSpinBox->value()));
+        m_statusValueLabel->setStyleSheet("color: #2ecc71; font-weight: bold;");
+        m_startServerBtn->setEnabled(false);
+        m_stopServerBtn->setEnabled(true);
+    } else {
+        m_statusValueLabel->setText(tr("已停止"));
+        m_statusValueLabel->setStyleSheet("color: #999;");
+        m_startServerBtn->setEnabled(true);
+        m_stopServerBtn->setEnabled(false);
+    }
+}
+
+/**
+ * @brief 连接到守护进程
+ */
+void MainWindow::connectToDaemon()
+{
+    if (!m_ipcSocket) {
+        return;
+    }
+    
+    if (m_ipcSocket->state() == QLocalSocket::UnconnectedState) {
+        m_ipcSocket->connectToServer(m_socketPath);
+    }
+}
+
+/**
+ * @brief 检查守护进程是否正在运行
+ */
+bool MainWindow::isDaemonRunning()
+{
+    // 尝试连接来检查守护进程是否运行
+    QLocalSocket testSocket;
+    testSocket.connectToServer(m_socketPath);
+    bool connected = testSocket.waitForConnected(500);
+    if (connected) {
+        testSocket.disconnectFromServer();
+    }
+    return connected;
+}
+
+/**
+ * @brief 自动启动守护进程
+ */
+bool MainWindow::autoStartDaemon()
+{
+    if (m_daemonProcess) {
+        return false;
+    }
+
+    // 获取 numlockd 可执行文件路径
+    QString exePath = QCoreApplication::applicationDirPath();
+    QString daemonPath = exePath + "/numlockd/numlockd";
+
+    // 检查文件是否存在
+    if (!QFile::exists(daemonPath)) {
+        // 尝试在当前目录查找
+        daemonPath = exePath + "/numlockd";
+        if (!QFile::exists(daemonPath)) {
+            appendLog(tr("找不到守护进程可执行文件"));
+            return false;
+        }
+    }
+
+    // 创建进程
+    m_daemonProcess = new QProcess(this);
+
+    // 设置工作目录为可执行文件所在目录
+    QString workDir = QFileInfo(daemonPath).absolutePath();
+    m_daemonProcess->setWorkingDirectory(workDir);
+
+    // 连接信号
+    connect(m_daemonProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this](int exitCode, QProcess::ExitStatus status) {
+        appendLog(tr("守护进程已退出 (代码: %1, 状态: %2)").arg(exitCode).arg(status));
+        m_autoStarted = false;
+        m_isServerRunning = false;
+        updateServerStatus();
+    });
+
+    connect(m_daemonProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+        appendLog(tr("守护进程错误: %1").arg(m_daemonProcess->errorString()));
+    });
+
+    // 启动进程
+    appendLog(tr("正在启动守护进程..."));
+    m_daemonProcess->start(daemonPath, QStringList());
+    if (!m_daemonProcess->waitForStarted(3000)) {
+        appendLog(tr("守护进程启动超时"));
+        delete m_daemonProcess;
+        m_daemonProcess = nullptr;
+        return false;
+    }
+
+    appendLog(tr("守护进程进程已启动，PID: %1").arg(m_daemonProcess->processId()));
+
+    // 等待服务器准备好接受连接
+    QThread::msleep(1000);
+
+    // 检查进程是否还在运行
+    if (m_daemonProcess->state() != QProcess::Running) {
+        appendLog(tr("守护进程启动后退出，退出码: %1").arg(m_daemonProcess->exitCode()));
+        delete m_daemonProcess;
+        m_daemonProcess = nullptr;
+        return false;
+    }
+
+    m_autoStarted = true;
+    m_isServerRunning = true;
+    updateServerStatus();
+    
+    return true;
+}
+
+/**
+ * @brief 连接成功槽函数
+ */
+void MainWindow::onSocketConnected()
+{
+    appendLog(tr("已连接到守护进程"));
+}
+
+/**
+ * @brief 连接断开槽函数
+ */
+void MainWindow::onSocketDisconnected()
+{
+    appendLog(tr("与守护进程断开连接"));
+}
+
+/**
+ * @brief 接收数据槽函数
+ */
+void MainWindow::onSocketReadyRead()
+{
+    if (!m_ipcSocket) {
+        return;
+    }
+    
+    QByteArray data = m_ipcSocket->readAll();
+    QString message = QString::fromUtf8(data);
+    
+    // 解析日志消息（格式 "LOG:message"）
+    if (message.startsWith("LOG:")) {
+        QString logMessage = message.mid(4);
+        appendLog(logMessage);
+    }
+}
+
+/**
+ * @brief 连接错误槽函数
+ */
+void MainWindow::onSocketError()
+{
+    if (!m_ipcSocket) {
+        return;
+    }
+    
+    QString errorString = m_ipcSocket->errorString();
+    appendLog(tr("IPC 连接错误: %1").arg(errorString));
+}
+
+/**
+ * @brief 发送配置到守护进程
+ */
+void MainWindow::sendConfigToDaemon(int minutes)
+{
+    if (!m_ipcSocket || m_ipcSocket->state() != QLocalSocket::ConnectedState) {
+        return;
+    }
+    
+    QString message = QString("CONFIG:%1").arg(minutes);
+    m_ipcSocket->write(message.toUtf8());
+    m_ipcSocket->flush();
 }

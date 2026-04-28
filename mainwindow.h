@@ -13,6 +13,9 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
+class QLocalSocket;
+class QProcess;
+
 DWIDGET_USE_NAMESPACE
 
 /**
@@ -51,6 +54,43 @@ private slots:
      * @brief 应用配置按钮槽函数
      */
     void onApplyConfig();
+    
+    /**
+     * @brief 连接到守护进程
+     */
+    void connectToDaemon();
+    
+    /**
+     * @brief 自动启动守护进程
+     * @return 是否成功启动
+     */
+    bool autoStartDaemon();
+    
+    /**
+     * @brief 检查守护进程是否正在运行
+     * @return 是否正在运行
+     */
+    bool isDaemonRunning();
+    
+    /**
+     * @brief 连接成功槽函数
+     */
+    void onSocketConnected();
+    
+    /**
+     * @brief 连接断开槽函数
+     */
+    void onSocketDisconnected();
+    
+    /**
+     * @brief 接收数据槽函数
+     */
+    void onSocketReadyRead();
+    
+    /**
+     * @brief 连接错误槽函数
+     */
+    void onSocketError();
 
 private:
     /**
@@ -68,6 +108,17 @@ private:
      * @param message 日志消息
      */
     void appendLog(const QString &message);
+    
+    /**
+     * @brief 发送配置到守护进程
+     * @param minutes 时间配置（分钟）
+     */
+    void sendConfigToDaemon(int minutes);
+    
+    /**
+     * @brief 更新服务器状态显示
+     */
+    void updateServerStatus();
 
     // 中央控件
     QWidget *m_centralWidget;           // 中央窗体
@@ -100,6 +151,14 @@ private:
     
     // 服务状态
     bool m_isServerRunning;             // 服务运行状态标志
+    
+    // IPC 连接
+    QLocalSocket* m_ipcSocket;          // IPC 连接
+    QString m_socketPath;               // socket 名称（默认 "numlockd"，Qt会在/tmp/下创建）
+    
+    // 服务器进程
+    QProcess* m_daemonProcess;          // 守护进程
+    bool m_autoStarted;                 // 是否由本程序自动启动的守护进程
 };
 
 #endif // MAINWINDOW_H
