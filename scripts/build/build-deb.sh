@@ -282,17 +282,17 @@ EOF
     # 复制构建产物
     info "复制构建产物..."
     
-    # 复制可执行文件
-    if [[ -f "$build_dir/src/app/candle" ]]; then
-        cp "$build_dir/src/app/candle" "$pkg_dir/opt/apps/org.yxzl.candle/bin/"
+    # 复制可执行文件（CMake 将可执行文件输出到构建根目录）
+    if [[ -f "$build_dir/candle" ]]; then
+        cp "$build_dir/candle" "$pkg_dir/opt/apps/org.yxzl.candle/bin/"
         chmod 755 "$pkg_dir/opt/apps/org.yxzl.candle/bin/candle"
     else
         error "未找到 candle 可执行文件"
         exit 1
     fi
     
-    if [[ -f "$build_dir/src/numlockd/numlockd" ]]; then
-        cp "$build_dir/src/numlockd/numlockd" "$pkg_dir/opt/apps/org.yxzl.candle/bin/"
+    if [[ -f "$build_dir/numlockd" ]]; then
+        cp "$build_dir/numlockd" "$pkg_dir/opt/apps/org.yxzl.candle/bin/"
         chmod 755 "$pkg_dir/opt/apps/org.yxzl.candle/bin/numlockd"
     else
         error "未找到 numlockd 可执行文件"
