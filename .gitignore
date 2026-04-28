@@ -1,0 +1,19 @@
+# IDE files
+.unioncode/
+.trae/
+
+# Build directories
+build/
+cmake-build-*/
+
+# Qt generated files
+*.pro.user
+*.pro.user.*
+.qmake.stash
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.out
+*.app
