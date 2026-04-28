@@ -104,9 +104,16 @@ void MainWindow::initUI()
     m_stopServerBtn->setFixedSize(140, 40);
     m_stopServerBtn->setProperty("type", "warning");  // 设置警告按钮样式
     m_stopServerBtn->setEnabled(false);  // 初始状态下禁用停止按钮
+
+    // 重启服务按钮
+    m_restartServerBtn = new DPushButton(tr("重启服务"), this);
+    m_restartServerBtn->setIcon(QIcon::fromTheme("view-refresh"));
+    m_restartServerBtn->setFixedSize(140, 40);
+    m_restartServerBtn->setProperty("type", "suggest");
     
     m_controlLayout->addWidget(m_startServerBtn);
     m_controlLayout->addWidget(m_stopServerBtn);
+    m_controlLayout->addWidget(m_restartServerBtn);
     m_controlLayout->addStretch();
     
     // ==================== 配置区域 ====================
@@ -120,7 +127,7 @@ void MainWindow::initUI()
     
     // 数值输入框
     m_valueSpinBox = new DSpinBox(this);
-    m_valueSpinBox->setRange(1, 9999);
+    m_valueSpinBox->setRange(2, 9999);
     m_valueSpinBox->setValue(15);
     m_valueSpinBox->setSuffix(tr(" 分钟"));
     m_valueSpinBox->setFixedWidth(180);
@@ -192,6 +199,9 @@ void MainWindow::setupConnections()
     
     // 停止服务按钮
     connect(m_stopServerBtn, &DPushButton::clicked, this, &MainWindow::onStopServer);
+
+    // 重启服务按钮
+    connect(m_restartServerBtn, &DPushButton::clicked, this, &MainWindow::onRestartServer);
     
     // 应用配置按钮
     connect(m_applyBtn, &DPushButton::clicked, this, &MainWindow::onApplyConfig);
@@ -216,6 +226,7 @@ void MainWindow::onStartServer()
     // 更新按钮状态
     m_startServerBtn->setEnabled(false);
     m_stopServerBtn->setEnabled(true);
+    m_restartServerBtn->setEnabled(true);
     
     // 记录日志
     appendLog(tr("服务已启动，设定时间: %1 分钟").arg(m_valueSpinBox->value()));
@@ -266,6 +277,42 @@ void MainWindow::onStopServer()
         m_autoStarted = false;
         appendLog(tr("守护进程已终止"));
     }
+}
+
+/**
+ * @brief 重启服务按钮槽函数
+ */
+void MainWindow::onRestartServer()
+{
+    if (!m_isServerRunning) {
+        appendLog(tr("服务已停止，现在启动服务..."));
+        onStartServer();
+        return;
+    }
+
+    appendLog(tr("正在重启服务..."));
+
+    m_isServerRunning = false;
+
+    // 断开与守护进程的连接
+    if (m_ipcSocket && m_ipcSocket->state() == QLocalSocket::ConnectedState) {
+        m_ipcSocket->disconnectFromServer();
+    }
+
+    // 如果是本程序自动启动的守护进程，则终止它
+    if (m_autoStarted && m_daemonProcess) {
+        m_daemonProcess->terminate();
+        if (!m_daemonProcess->waitForFinished(3000)) {
+            m_daemonProcess->kill();
+        }
+        delete m_daemonProcess;
+        m_daemonProcess = nullptr;
+        m_autoStarted = false;
+    }
+
+    QThread::msleep(500);
+
+    onStartServer();
 }
 
 /**

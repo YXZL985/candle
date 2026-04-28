@@ -49,6 +49,11 @@ private slots:
      * @brief 停止服务按钮槽函数
      */
     void onStopServer();
+
+    /**
+     * @brief 重启服务按钮槽函数
+     */
+    void onRestartServer();
     
     /**
      * @brief 应用配置按钮槽函数
@@ -129,6 +134,7 @@ private:
     QHBoxLayout *m_controlLayout;       // 控制区域布局
     DPushButton *m_startServerBtn;      // 启动服务按钮
     DPushButton *m_stopServerBtn;       // 停止服务按钮
+    DPushButton *m_restartServerBtn;    // 重启服务按钮
     
     // 配置区域
     DFrame *m_configFrame;              // 配置区域框架
