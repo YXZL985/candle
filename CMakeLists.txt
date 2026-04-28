@@ -51,3 +51,11 @@ install(FILES images/logo.svg
     DESTINATION share/icons/hicolor/scalable/apps
     RENAME org.yxzl.candle.svg
 )
+
+# 添加 numlockd 守护进程子目录
+add_subdirectory(numlockd)
+
+# 安装 numlockd 守护进程（必须在 add_subdirectory 之后）
+install(TARGETS numlockd
+    RUNTIME DESTINATION bin
+)

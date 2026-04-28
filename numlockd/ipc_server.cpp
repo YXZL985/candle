@@ -1,0 +1,157 @@
+#include "ipc_server.h"
+
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QFile>
+#include <QDebug>
+
+IpcServer::IpcServer(const QString& socketPath, QObject* parent)
+    : QObject(parent)
+    , m_server(nullptr)
+    , m_socketPath(socketPath)
+{
+}
+
+IpcServer::~IpcServer()
+{
+    stop();
+}
+
+bool IpcServer::start()
+{
+    if (m_server) {
+        qWarning() << "IPC server is already running";
+        return false;
+    }
+
+    // 删除旧的 socket 文件（如果存在）- Qt在Unix系统上使用/tmp/目录
+    QString fullSocketPath = QStringLiteral("/tmp/%1").arg(m_socketPath);
+    if (QFile::exists(fullSocketPath)) {
+        if (!QFile::remove(fullSocketPath)) {
+            qWarning() << "Failed to remove old socket file:" << fullSocketPath;
+        } else {
+            qDebug() << "Removed old socket file:" << fullSocketPath;
+        }
+    }
+
+    m_server = new QLocalServer(this);
+    connect(m_server, &QLocalServer::newConnection, this, &IpcServer::onNewConnection);
+
+    if (!m_server->listen(m_socketPath)) {
+        qCritical() << "Failed to start IPC server:" << m_server->errorString();
+        delete m_server;
+        m_server = nullptr;
+        return false;
+    }
+
+    qDebug() << "IPC server started on:" << m_socketPath;
+    return true;
+}
+
+void IpcServer::stop()
+{
+    // 关闭所有客户端连接
+    for (QLocalSocket* client : m_clients) {
+        if (client) {
+            disconnect(client, nullptr, this, nullptr);
+            client->close();
+            client->deleteLater();
+        }
+    }
+    m_clients.clear();
+
+    // 关闭服务器
+    if (m_server) {
+        m_server->close();
+        delete m_server;
+        m_server = nullptr;
+        qDebug() << "IPC server stopped";
+    }
+
+    // 删除 socket 文件 - Qt在Unix系统上使用/tmp/目录
+    QString fullSocketPath = QStringLiteral("/tmp/%1").arg(m_socketPath);
+    if (QFile::exists(fullSocketPath)) {
+        QFile::remove(fullSocketPath);
+    }
+}
+
+void IpcServer::sendLog(const QString& message)
+{
+    if (m_clients.isEmpty()) {
+        return;
+    }
+
+    QString logMessage = QStringLiteral("LOG:%1").arg(message);
+    QByteArray data = logMessage.toUtf8();
+
+    // 向所有连接的客户端发送日志消息
+    for (QLocalSocket* client : m_clients) {
+        if (client && client->state() == QLocalSocket::ConnectedState) {
+            client->write(data);
+            client->flush();
+        }
+    }
+}
+
+void IpcServer::onNewConnection()
+{
+    QLocalSocket* client = m_server->nextPendingConnection();
+    if (!client) {
+        return;
+    }
+
+    m_clients.append(client);
+    qDebug() << "New client connected. Total clients:" << m_clients.size();
+
+    connect(client, &QLocalSocket::readyRead, this, &IpcServer::onReadyRead);
+    connect(client, &QLocalSocket::disconnected, this, &IpcServer::onClientDisconnected);
+    connect(client, &QLocalSocket::errorOccurred, this, [this, client](QLocalSocket::LocalSocketError error) {
+        qWarning() << "Socket error for client:" << error;
+        if (!m_clients.contains(client)) {
+            return;
+        }
+        m_clients.removeOne(client);
+        client->deleteLater();
+    });
+}
+
+void IpcServer::onReadyRead()
+{
+    QLocalSocket* client = qobject_cast<QLocalSocket*>(sender());
+    if (!client || !m_clients.contains(client)) {
+        return;
+    }
+
+    QByteArray data = client->readAll();
+    QString message = QString::fromUtf8(data).trimmed();
+
+    qDebug() << "Received message from client:" << message;
+
+    // 解析 CONFIG:N 格式的消息
+    if (message.startsWith(QStringLiteral("CONFIG:"))) {
+        QString valueStr = message.mid(7); // 去掉 "CONFIG:" 前缀
+        bool ok;
+        int intervalMinutes = valueStr.toInt(&ok);
+        if (ok && intervalMinutes > 0) {
+            qDebug() << "Config received: interval =" << intervalMinutes << "minutes";
+            emit configReceived(intervalMinutes);
+        } else {
+            qWarning() << "Invalid config value:" << valueStr;
+        }
+    }
+}
+
+void IpcServer::onClientDisconnected()
+{
+    QLocalSocket* client = qobject_cast<QLocalSocket*>(sender());
+    if (!client) {
+        return;
+    }
+
+    if (m_clients.contains(client)) {
+        m_clients.removeOne(client);
+        qDebug() << "Client disconnected. Total clients:" << m_clients.size();
+    }
+
+    client->deleteLater();
+}
