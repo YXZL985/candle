@@ -9,11 +9,12 @@
 #include <QPropertyAnimation>
 #include <QDate>
 #include <QLayout>
+
 DWIDGET_USE_NAMESPACE
 
 int main(int argc, char *argv[])
 {
-    QGuiApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+    // Qt6 中 AA_UseHighDpiPixmaps 已被移除，高DPI默认启用
     DApplication a(argc, argv);
     a.setOrganizationName("deepin");
     a.setApplicationName("dtk-application");
@@ -63,4 +64,3 @@ int main(int argc, char *argv[])
 
     return a.exec();
 }
-
