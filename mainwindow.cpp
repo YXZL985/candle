@@ -92,9 +92,9 @@ void MainWindow::initUI()
     // 数值输入框
     m_valueSpinBox = new DSpinBox(this);
     m_valueSpinBox->setRange(1, 9999);
-    m_valueSpinBox->setValue(30);
+    m_valueSpinBox->setValue(15);
     m_valueSpinBox->setSuffix(tr(" 分钟"));
-    m_valueSpinBox->setFixedWidth(150);
+    m_valueSpinBox->setFixedWidth(180);
     
     // 应用配置按钮
     m_applyBtn = new DPushButton(tr("应用配置"), this);
