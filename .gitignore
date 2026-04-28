@@ -6,6 +6,9 @@
 build/
 cmake-build-*/
 
+# Allow scripts/build directory
+!scripts/build/
+
 # Qt generated files
 *.pro.user
 *.pro.user.*
