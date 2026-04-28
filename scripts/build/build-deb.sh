@@ -202,7 +202,7 @@ create_deb_structure() {
     # 创建目录
     mkdir -p "$pkg_dir/DEBIAN"
     mkdir -p "$pkg_dir/opt/apps/org.yxzl.candle/bin"
-    mkdir -p "$pkg_dir/opt/apps/org.yxzl.candle/share/icons/hicolor/scalable/apps"
+    mkdir -p "$pkg_dir/usr/share/icons/hicolor/scalable/apps"
     mkdir -p "$pkg_dir/lib/systemd/system"
     mkdir -p "$pkg_dir/usr/share/applications"
     mkdir -p "$pkg_dir/usr/share/doc/candle"
@@ -240,6 +240,11 @@ echo 'KERNEL=="uinput", MODE="0660", GROUP="input"' > /etc/udev/rules.d/99-candl
 if command -v udevadm &> /dev/null; then
     udevadm control --reload-rules || true
     udevadm trigger || true
+fi
+
+# 更新图标缓存
+if command -v gtk-update-icon-cache &> /dev/null; then
+    gtk-update-icon-cache -f /usr/share/icons/hicolor || true
 fi
 
 exit 0
@@ -299,9 +304,9 @@ EOF
         exit 1
     fi
     
-    # 复制图标
+    # 复制图标到系统标准图标路径
     if [[ -f "$project_root/assets/images/logo.svg" ]]; then
-        cp "$project_root/assets/images/logo.svg" "$pkg_dir/opt/apps/org.yxzl.candle/share/icons/hicolor/scalable/apps/org.yxzl.candle.svg"
+        cp "$project_root/assets/images/logo.svg" "$pkg_dir/usr/share/icons/hicolor/scalable/apps/org.yxzl.candle.svg"
     fi
     
     # 复制服务文件
