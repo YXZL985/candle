@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     a.setProductName("Candle");
     
     // 设置应用描述
-    a.setApplicationDescription(QCoreApplication::translate("Main", "秉烛 - 基于 DTK6 的应用程序\n作者：燕戏竹林 (YXZL985)\n项目地址：https://github.com/YXZL985/candle.git"));
+    a.setApplicationDescription(QCoreApplication::translate("Main", "秉烛 - 基于 DTK6 的应用程序，用于临时阻止屏幕自动熄灭/锁定屏幕/休眠\n作者：燕戏竹林 (YXZL985)\n项目地址：https://github.com/YXZL985/candle.git"));
     
     // 加载翻译器
     a.loadTranslator();
