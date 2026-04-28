@@ -11,6 +11,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
+# 设置安装前缀为 /opt/apps/org.yxzl.candle
+set(CMAKE_INSTALL_PREFIX "/opt/apps/org.yxzl.candle" CACHE PATH "Installation prefix" FORCE)
+
 # 查找 Qt6 包
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui)
 
@@ -36,4 +39,15 @@ target_link_libraries(candle
     Qt6::Core
     Qt6::Widgets
     Qt6::Gui
+)
+
+# 安装目标
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+)
+
+# 安装图标
+install(FILES images/logo.svg
+    DESTINATION share/icons/hicolor/scalable/apps
+    RENAME org.yxzl.candle.svg
 )
